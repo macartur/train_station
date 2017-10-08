@@ -4,6 +4,8 @@
 
 [node name="Node2D" type="Node2D"]
 
+z/z = 11
+
 [node name="Sprite" type="Sprite" parent="."]
 
 texture = ExtResource( 1 )

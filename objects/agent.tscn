@@ -6,6 +6,7 @@
 
 [node name="Sprite" type="Sprite" parent="."]
 
+z/z = 25
 texture = ExtResource( 1 )
 offset = Vector2( 10, 10 )
 

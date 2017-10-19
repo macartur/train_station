@@ -43,10 +43,12 @@ class Agent:
 				for y in [column-1, column, column+1]:
 					if x >= map.width or y >= map.height or x <= 0 or y <= 0:
 						continue
-					if typeof(map.board[x][y]) == TYPE_INT and x < map.width and y < map.height and \
-						map.influence_map[x][y] <= map.influence_map[next_x][next_y]:
-						next_x = x
-						next_y = y
+					if typeof(map.board[x][y]) == TYPE_INT and x < map.width and y < map.height:
+						if (self.side == 'left' and map.influence_map[x][y] <= map.influence_map[next_x][next_y]) or \
+						   (self.side == 'right' and map.influence_map[x][y] > map.influence_map[next_x][next_y]):
+							next_x = x
+							next_y = y
+						
 			map.move_object(self, line, column, next_x, next_y)
 
 class Door:
@@ -71,7 +73,7 @@ class Door:
 				if (obj.side == 'left' and x == 39) or (obj.side == 'right' and x == 0):
 					map.remove_object(tmp_x,n)
 				
-		if self.timestamp < 0 and map.influence_map[x][y] > 0 :
+		if self.timestamp < 0:
 			if x == 0:
 				var agent = Agent.new('left')
 				map.set_object(agent, x+1,y)

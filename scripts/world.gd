@@ -12,7 +12,7 @@ class Agent:
 	var last_update = 0.02
 	var side
 	var influence_number
-	
+
 	func _init(side='left', influence_number=200):
 		if side == 'left':
 			self.object = agent_left.instance()
@@ -21,6 +21,9 @@ class Agent:
 			self.object = agent_right.instance()
 			self.influence_number = influence_number*(-1)
 		self.side = side
+
+	func type():
+		return 'Agent'
 
 	func add_influence(map, x, y):
 		for line in range(map.width):
@@ -65,6 +68,13 @@ class Door:
 		self.timestamp =  self.get_random_value()
 		self.influence_number = influence_number
 
+	func type():
+		return 'Door'
+		
+	func delete(map):
+		map.object.remove_child(self.object)
+		self.object.free()
+
 	func update(delta, map, x, y):
 		self.timestamp -= delta
 		
@@ -99,21 +109,38 @@ class Door:
 			for tmp_y in range(map.height):
 				map.influence_map[tmp_x][tmp_y] += self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
 
+	func remove_influence(map, x, y):
+		for tmp_x in range(map.width):
+			for tmp_y in range(map.height):
+				map.influence_map[tmp_x][tmp_y] -= self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
+
 class Block:
-	var object  # object of scene
+	var object
 	var influence_number
 	
 	func _init(influence_number=0):
 		self.object = block_scene.instance()
 		self.influence_number = influence_number
 	
+	func type():
+		return 'Block'
+	
 	func update(delta, map, line, column):
 		pass
+
+	func delete(map):
+		map.object.remove_child(self.object)
+		self.object.free()
 
 	func add_influence(map, x, y):
 		for tmp_x in range(map.width):
 				for tmp_y in range(map.height):
 					map.influence_map[tmp_x][tmp_y] += self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
+					
+	func remove_influence(map, x, y):
+		for tmp_x in range(map.width):
+				for tmp_y in range(map.height):
+					map.influence_map[tmp_x][tmp_y] -= self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
 
 class Map:
 	var board
@@ -141,6 +168,13 @@ class Map:
 			for column in range(height):
 				columns.append(0)
 			map.append(columns)
+
+	func clear():
+		for x in range(self.width):
+			for y in range(self.height):
+				var obj = self.board[x][y]
+				if  typeof(obj) != TYPE_INT and obj.type() == 'Agent':
+					self.remove_object(x,y)
 
 	func create_blocks():
 		for x in range(self.width):
@@ -179,11 +213,11 @@ class Map:
 		self.board[next_x][next_y] = instance
 		instance.object.set_pos(Vector2(self.tile_size*next_x, self.tile_size*next_y))
 		
-	func update(delta):
+	func update(delta, stopped):
 		for x in range(self.width):
 			for y in range(self.height):
 				var obj = self.board[x][y]
-				if typeof(obj) != TYPE_INT:
+				if typeof(obj) != TYPE_INT and not stopped:
 					obj.update(delta, self, x, y)
 
 #  GAME LOOP
@@ -193,8 +227,11 @@ func _ready():
 	set_process(true)
 	
 var last = 1
+var stopped = false
+
 func _process(delta):
 	last -= delta
 	if last < 0:
 		last = 1
-		map.update(delta)
+		times -= 1
+		map.update(delta, stopped)

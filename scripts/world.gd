@@ -1,4 +1,3 @@
-
 extends Node
 
 # LOAD OBJECTS
@@ -7,9 +6,11 @@ const agent_left = preload("res://objects/agent_right.tscn")
 const door_scene = preload('res://objects/door.tscn') 
 const block_scene = preload('res://objects/block.tscn')
 
+# MAIN CLASSES
 class Agent:
 	var object
-	var last_update = 0.02
+	var last_update
+	var speed
 	var side
 	var influence_number
 
@@ -21,6 +22,11 @@ class Agent:
 			self.object = agent_right.instance()
 			self.influence_number = influence_number*(-1)
 		self.side = side
+		self.speed = 0.02
+		self.last_update = self.speed
+
+	func set_speed(number):
+		self.speed = number
 
 	func type():
 		return 'Agent'
@@ -40,12 +46,14 @@ class Agent:
 		self.object.free()
 
 	func update(delta, map, line, column):
-		last_update -= delta
+		print(self.last_update)
+		self.last_update -= delta
 		
-		if last_update < 0.0:
+		if self.last_update < 0.0:
+			self.last_update = self.speed
+
 			var next_x = line
 			var next_y = column
-			last_update = 0.02
 			for x in [line-1,line,line+1]:
 				for y in [column-1, column, column+1]:
 					if x > map.width or y > map.height or x < 0 or y < 0:
@@ -143,6 +151,8 @@ class Block:
 					map.influence_map[tmp_x][tmp_y] -= self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
 
 class Map:
+	var last_update
+	var update_time
 	var board
 	var influence_map
 	var tile_size
@@ -151,6 +161,8 @@ class Map:
 	var object
 	
 	func _init(width, height, object):
+		self.update_time =1
+		self.last_update = self.update_time
 		self.tile_size = 20
 		self.width = width
 		self.height = height
@@ -200,7 +212,6 @@ class Map:
 		instance.object.set_pos(Vector2(self.tile_size*x, self.tile_size*y))
 	
 	func remove_object(x, y):
-		print(self.board[x][y])
 		var instance = self.board[x][y]
 		instance.remove_influence(self, x, y)
 		self.board[x][y] = 0
@@ -214,24 +225,61 @@ class Map:
 		instance.object.set_pos(Vector2(self.tile_size*next_x, self.tile_size*next_y))
 		
 	func update(delta, stopped):
+		if stopped == 'Stopped':
+			return
+		self.last_update -= delta
+		if self.last_update > 0:
+			return
+
+		self.last_update = self.update_time
 		for x in range(self.width):
 			for y in range(self.height):
 				var obj = self.board[x][y]
-				if typeof(obj) != TYPE_INT and not stopped:
+				if typeof(obj) != TYPE_INT:
 					obj.update(delta, self, x, y)
 
+class Game:
+	var menu_items
+	var map
+	
+	func _init(menu, map):
+		self.map = map
+		
+		var items_name = ['start_button','stop_button',
+							'agent_speed','left_port_speed',
+							'right_port_speed', 'status', 'reset_button']
+		self.menu_items = {}
+		for name in items_name:
+			self.menu_items[name] = menu.get_node(name)
+			if 'speed' in name:
+				self._create_speed_itens(self.menu_items[name])
+		
+	func _create_speed_itens(button):
+		button.add_item('slow', 0)
+		button.add_item('normal', 1)
+		button.add_item('fast', 2)
+		button.select(1)
+	
+	func is_stopped():
+		return self.menu_items['status'].get_text()
+	
+	func update(delta):
+		if self.menu_items['start_button'].is_pressed():
+			self.menu_items['status'].set_text('Running')
+		if self.menu_items['stop_button'].is_pressed():
+			self.menu_items['status'].set_text('Stopped')
+		if self.menu_items['reset_button'].is_pressed():
+			self.map.clear()
+			self.menu_items['status'].set_text('Stopped')
+		self.map.update(delta, self.is_stopped())
+
 #  GAME LOOP
-var map = Map.new(40,30, get_node('.'))
+var game
 
 func _ready():
+	var map = Map.new(40,30, get_node('.'))
+	game = Game.new(get_node('/root/world/menu'), map)
 	set_process(true)
-	
-var last = 1
-var stopped = false
 
 func _process(delta):
-	last -= delta
-	if last < 0:
-		last = 1
-		times -= 1
-		map.update(delta, stopped)
+	game.update(delta)

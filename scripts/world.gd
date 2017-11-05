@@ -3,8 +3,9 @@ extends Node
 # LOAD OBJECTS
 const agent_right = preload("res://objects/agent_left.tscn")
 const agent_left = preload("res://objects/agent_right.tscn")
-const door_scene = preload('res://objects/door.tscn') 
+const door_scene = preload('res://objects/door.tscn')
 const block_scene = preload('res://objects/block.tscn')
+const block_texture = preload('res://sources/block_2.png')
 
 # CLASSES
 class Agent:
@@ -14,7 +15,7 @@ class Agent:
 	var side
 	var influence_number
 
-	func _init(side, influence_number=300):
+	func _init(side, influence_number=0):
 		if side == 'left':
 			self.object = agent_left.instance()
 			self.influence_number = influence_number
@@ -31,12 +32,12 @@ class Agent:
 	func add_influence(map, x, y):
 		for next_x in range(map.width):
 			for next_y in range(map.height):
-				map.influence_map[next_x][next_y] += self.influence_number/(1+abs(next_x - x)+abs(next_y - y))^2
+				map.influence_map[next_x][next_y] += self.influence_number/pow(1+abs(next_x - x)+abs(next_y - y),2)
 
 	func remove_influence(map, x, y):
 		for next_x in range(map.width):
 			for next_y in range(map.height):
-				map.influence_map[next_x][next_y] -= self.influence_number/(1+abs(next_x - x)+abs(next_y - y))^2
+				map.influence_map[next_x][next_y] -= self.influence_number/pow(1+abs(next_x - x)+abs(next_y - y),2)
 
 	func delete(map):
 		map.object.remove_child(self.object)
@@ -64,12 +65,14 @@ class Door:
 	var object
 	var influence_number
 	var born_speed
+	var max_agent
 
 	func _init(born_speed,influence_number=10000):
 		self.object = door_scene.instance()
 		self.timestamp =  born_speed + self.get_random_value()
 		self.born_speed = born_speed + self.get_random_value()
 		self.influence_number = influence_number
+		self.max_agent = self.rand_int()
 
 	func type():
 		return 'Door'
@@ -80,11 +83,11 @@ class Door:
 
 	func update(delta, map, x, y):
 		self.timestamp -= delta
-		
+
 		var tmp_x = 0
 		if x == 0:
 			tmp_x = x+1
-		else: 
+		else:
 			tmp_x = x-1
 
 		for n in [y-1, y, y+1]:
@@ -93,15 +96,22 @@ class Door:
 				if (obj.side == 'left' and x == 39) or (obj.side == 'right' and x == 0):
 					map.remove_object(tmp_x,n)
 
-		if self.timestamp < 0.0:
-			if x == 0 and typeof(map.board[x+1][y]) == TYPE_INT and typeof(map.board[x+1][y-1]) == TYPE_INT and typeof(map.board[x+1][y+1]) == TYPE_INT:
+		if self.timestamp < 0.0 and self.max_agent > 0:
+			if x == 0 and typeof(map.board[x+1][y]) == TYPE_INT and \
+			   typeof(map.board[x+1][y-1]) == TYPE_INT and typeof(map.board[x+1][y+1]) == TYPE_INT:
 				var agent = Agent.new('left')
 				map.set_object(agent, x+1, y)
 				self.timestamp = self.get_random_value() + self.born_speed
-			elif x == 39 and typeof(map.board[x-1][y]) == TYPE_INT and typeof(map.board[x-1][y-1]) == TYPE_INT and typeof(map.board[x-1][y+1]) == TYPE_INT:
+			elif x == 39 and typeof(map.board[x-1][y]) == TYPE_INT and \
+			     typeof(map.board[x-1][y-1]) == TYPE_INT and typeof(map.board[x-1][y+1]) == TYPE_INT:
 				var agent = Agent.new('right')
 				map.set_object(agent, x-1, y)
 				self.timestamp = self.get_random_value() + self.born_speed
+			self.max_agent -= 1
+
+	func rand_int():
+		randomize()
+		return randi()%5
 
 	func get_random_value():
 		randomize()
@@ -110,24 +120,27 @@ class Door:
 	func add_influence(map, x, y):
 		for tmp_x in range(map.width):
 			for tmp_y in range(map.height):
-				map.influence_map[tmp_x][tmp_y] += self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
+				map.influence_map[tmp_x][tmp_y] += self.influence_number/pow(1+abs(tmp_x - x)+abs(tmp_y - y),2)
 
 	func remove_influence(map, x, y):
 		for tmp_x in range(map.width):
 			for tmp_y in range(map.height):
-				map.influence_map[tmp_x][tmp_y] -= self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
+				map.influence_map[tmp_x][tmp_y] -= self.influence_number/pow(1+abs(tmp_x - x)+abs(tmp_y - y),2)
 
 class Block:
 	var object
 	var influence_number
-	
-	func _init(influence_number=1000):
+
+	func _init(influence_number=10):
 		self.object = block_scene.instance()
 		self.influence_number = influence_number
-	
+
+	func set_obstacle():
+		self.object.get_node('Sprite').set_texture(block_texture)
+
 	func type():
 		return 'Block'
-	
+
 	func update(delta, map, x, y):
 		pass
 
@@ -138,12 +151,12 @@ class Block:
 	func add_influence(map, x, y):
 		for tmp_x in range(map.width):
 				for tmp_y in range(map.height):
-					map.influence_map[tmp_x][tmp_y] += self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
-					
+					map.influence_map[tmp_x][tmp_y] += self.influence_number/pow(1+abs(tmp_x - x)+abs(tmp_y - y),2)
+
 	func remove_influence(map, x, y):
 		for tmp_x in range(map.width):
 				for tmp_y in range(map.height):
-					map.influence_map[tmp_x][tmp_y] -= self.influence_number/(1+abs(tmp_x - x)+abs(tmp_y - y))^2
+					map.influence_map[tmp_x][tmp_y] -= self.influence_number/pow(1+abs(tmp_x - x)+abs(tmp_y - y),2)
 
 class Map:
 	var last_update
@@ -154,9 +167,9 @@ class Map:
 	var width
 	var height
 	var object
-	
+
 	func _init(width, height, object):
-		self.update_time =0.5
+		self.update_time =0.2
 		self.last_update = self.update_time
 		self.tile_size = 20
 		self.width = width
@@ -200,12 +213,16 @@ class Map:
 					self.set_object(block, x, y)
 
 	func create_doors():
-		# right door
 		for y in [2,3,4,14,15,16,23,24,25]:
-			var door = Door.new(0.1, 10000)
+			var door = Door.new(0.1, 100)
 			self.set_object(door, 0, y)
-			var door = Door.new(0.1,-10000)
+			var door = Door.new(0.1,-100)
 			self.set_object(door, 39, y)
+	
+	func clear_doors():
+		for y in [2,3,4,14,15,16,23,24,25]:
+			self.remove_object(0,y)
+			self.remove_object(39,y)
 
 	func set_object(instance, x, y):
 		if typeof(self.board[x][y]) != TYPE_INT:
@@ -230,7 +247,7 @@ class Map:
 		self.board[x][y] = 0
 		self.board[next_x][next_y] = instance
 		instance.object.set_pos(Vector2(self.tile_size*next_x, self.tile_size*next_y))
-		
+
 	func update(delta, stopped):
 		if stopped == 'Stopped':
 			return
@@ -253,7 +270,7 @@ class Map:
 class Game:
 	var menu_items
 	var map
-	
+
 	func _init(menu, map):
 		self.map = map
 		var items_name = ['start_button','stop_button','left_door_speed',
@@ -263,13 +280,13 @@ class Game:
 			self.menu_items[name] = menu.get_node(name)
 			if 'speed' in name:
 				self._create_speed_itens(self.menu_items[name])
-		
+
 	func _create_speed_itens(button):
 		button.add_item('slow', 0)
 		button.add_item('normal', 1)
 		button.add_item('fast', 2)
 		button.select(1)
-	
+
 	func is_stopped():
 		return self.menu_items['status'].get_text()
 
@@ -284,6 +301,8 @@ class Game:
 			self.menu_items['status'].set_text('Stopped')
 		if self.menu_items['reset_train_station'].is_pressed():
 			self.map.clear_blocks()
+			self.map.clear_doors()
+			self.map.create_doors()
 			self.menu_items['status'].set_text('Stopped')
 		self.map.update(delta, self.is_stopped())
 
@@ -304,7 +323,7 @@ class Game:
 var game
 
 func _ready():
-	# SETUP THE GAME 
+	# SETUP THE GAME
 	set_process_input(true)
 	set_process(true)
 	var map = Map.new(40,30, get_node('.'))
@@ -317,7 +336,7 @@ func _process(delta):
 func _input(ev):
 	# GET INPUT EVENT
 	if (ev.type==InputEvent.MOUSE_BUTTON): # MOUSE EVENT
-		if ev.pressed and game.is_stopped() == "Stopped":
+		if ev.pressed and game.is_stopped() != "Running":
 			# CALCULATE THE BOARD POSITION
 			var x = int(ev.pos.x) / game.map.tile_size
 			var y = int(ev.pos.y) / game.map.tile_size
@@ -327,5 +346,6 @@ func _input(ev):
 			if ev.button_index == BUTTON_LEFT:  # CREATE OBJECT WHEN BUTTON LEFT IS PRESSED
 				var block = Block.new()
 				game.map.set_object(block, x, y)
+				block.set_obstacle()
 			elif ev.button_index == BUTTON_RIGHT: # REMOVE OBJECT WHEN BUTTON LEFT IS PRESSED
 					game.map.remove_object(x,y)

@@ -65,14 +65,12 @@ class Door:
 	var object
 	var influence_number
 	var born_speed
-	var max_agent
 
 	func _init(born_speed,influence_number=10000):
 		self.object = door_scene.instance()
 		self.timestamp =  born_speed + self.get_random_value()
 		self.born_speed = born_speed + self.get_random_value()
 		self.influence_number = influence_number
-		self.max_agent = self.rand_int()
 
 	func type():
 		return 'Door'
@@ -90,13 +88,7 @@ class Door:
 		else:
 			tmp_x = x-1
 
-		for n in [y-1, y, y+1]:
-			var obj = map.board[tmp_x][n]
-			if typeof(obj) != TYPE_INT:
-				if (obj.side == 'left' and x == 39) or (obj.side == 'right' and x == 0):
-					map.remove_object(tmp_x,n)
-
-		if self.timestamp < 0.0 and self.max_agent > 0:
+		if self.timestamp < 0.0:
 			if x == 0 and typeof(map.board[x+1][y]) == TYPE_INT and \
 			   typeof(map.board[x+1][y-1]) == TYPE_INT and typeof(map.board[x+1][y+1]) == TYPE_INT:
 				var agent = Agent.new('left')
@@ -107,15 +99,20 @@ class Door:
 				var agent = Agent.new('right')
 				map.set_object(agent, x-1, y)
 				self.timestamp = self.get_random_value() + self.born_speed
-			self.max_agent -= 1
+				
+		
+		if self.timestamp < 0.0:
+			for n in [y-1, y, y+1]:
+				var obj = map.board[tmp_x][n]
+				if typeof(obj) != TYPE_INT:
+					if obj.type() == "Agent" and \
+					   ((obj.side == 'left' and x == 39) or (obj.side == 'right' and x == 0)):
+						map.remove_object(tmp_x,n)
 
-	func rand_int():
-		randomize()
-		return randi()%5
 
 	func get_random_value():
 		randomize()
-		return randf()/20
+		return randf()/10
 
 	func add_influence(map, x, y):
 		for tmp_x in range(map.width):
@@ -214,9 +211,9 @@ class Map:
 
 	func create_doors():
 		for y in [2,3,4,14,15,16,23,24,25]:
-			var door = Door.new(0.1, 100)
+			var door = Door.new(0.1, 10000)
 			self.set_object(door, 0, y)
-			var door = Door.new(0.1,-100)
+			var door = Door.new(0.1,-10000)
 			self.set_object(door, 39, y)
 	
 	func clear_doors():
